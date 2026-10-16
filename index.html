@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>kano · 01101011</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text x=%2214%22 y=%2272%22 font-size=%2260%22 fill=%22%2339ff88%22 font-family=%22monospace%22>k</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000; --fg:#e6e6e6; --dim:#6f7a72; --line:#1e2621; --acc:#39ff88;
+    --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:15px;line-height:1.6}
+  body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  button,input{font:inherit;color:inherit}
+  button{background:none;border:1px solid var(--dim);padding:.5em 1em;cursor:pointer}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+  input{background:transparent;border:0;border-bottom:1px solid var(--dim);padding:.5em 0;width:100%;border-radius:0}
+  input:focus{border-bottom-color:var(--acc)}
+  .hidden{display:none!important}
+
+  /* ---------- gate ---------- */
+  #rain{position:fixed;inset:0;width:100%;height:100%;opacity:.28;z-index:0}
+  #gate{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;justify-content:center;max-width:560px;margin:0 auto;padding:32px 24px}
+  h1{font-weight:700;font-size:clamp(72px,22vw,140px);line-height:.95;margin:0;letter-spacing:-.04em}
+  .bin{color:var(--acc);margin:6px 0 36px;font-weight:300;word-break:break-all}
+  .sub{color:var(--dim);margin:0 0 20px}
+  label{display:block;color:var(--dim);margin-top:24px}
+  .row{display:flex;gap:12px;margin-top:32px}
+  #go{border-color:var(--acc);color:var(--acc)}
+  #go:hover{background:var(--acc);color:#000}
+  #go:disabled{opacity:.4;cursor:wait}
+  .err{min-height:1.6em;margin-top:16px}
+  .note{color:var(--dim);margin-top:40px;border-top:1px solid var(--line);padding-top:16px;font-size:13px}
+
+  /* ---------- chat ---------- */
+  #chat{height:100dvh;display:flex;flex-direction:column;max-width:920px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header .code{color:var(--acc);font-weight:700;letter-spacing:.12em}
+  header .meta{color:var(--dim);margin-right:auto;font-size:13px}
+  header button{padding:.25em .75em;font-size:13px}
+  #log{flex:1;overflow-y:auto;padding:16px 18px}
+  .msg{margin:0 0 8px;overflow-wrap:anywhere}
+  .msg .t{color:var(--dim)}
+  .msg .n{color:#9aa49d}
+  .msg.me .n{color:var(--acc)}
+  .msg .x.coded{color:var(--dim);font-weight:300;font-size:13px}
+  .msg.sys{color:var(--dim)}
+  form{display:flex;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+  form span{color:var(--acc)}
+  #wipe.armed{background:var(--acc);border-color:var(--acc);color:#000}
+  .cur::after{content:"█";color:var(--acc);margin-left:.3em;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.cur::after{animation:none}#log{scroll-behavior:auto}}
+
+  /* ---------- manual mode ---------- */
+  #manual{position:fixed;inset:0;z-index:5;background:rgba(0,0,0,.95);overflow:auto;padding:24px}
+  #manual .box{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  #manual .box>div{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  #manual textarea{width:100%;min-height:110px;background:transparent;border:1px solid var(--dim);color:var(--fg);font:inherit;font-size:12px;padding:8px;resize:vertical;word-break:break-all}
+  #manual textarea:focus-visible{outline:2px solid var(--acc,var(--fg))}
+  #manual p{margin:0;color:var(--dim)}
+  #mErr{min-height:1.5em}
+  .alt{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .alt button{font-size:13px;padding:.35em .8em;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<canvas id="rain" aria-hidden="true"></canvas>
+
+<section id="gate">
+  <h1>kano</h1>
+  <p class="bin" id="nickBin" aria-hidden="true"></p>
+  <p class="sub cur">приватный канал. сервера нет, данные только на твоём устройстве</p>
+
+  <label for="name">username</label>
+  <input id="name" maxlength="20" autocomplete="off" spellcheck="false" value="kano">
+
+  <label for="code">channel.id</label>
+  <input id="code" maxlength="12" autocomplete="off" spellcheck="false" placeholder="пусто = создать новый канал">
+
+  <div class="row"><button id="go">connect()</button></div>
+  <div class="err" id="err" role="alert"></div>
+  <div class="alt"><button id="mHost">без сервера: создать</button><button id="mJoin">без сервера: войти</button></div>
+
+  <p class="note">
+    Создай канал, получи код, отправь его другу. Браузеры соединяются напрямую (P2P),
+    история пишется в localStorage. Кнопка «rm -rf» стирает всё с твоего устройства.
+    Кнопка «mode» показывает сообщения как текст, binary или hex.
+  </p>
+</section>
+
+<section id="chat" class="hidden">
+  <header>
+    <span class="code" id="roomLabel"></span>
+    <button id="copy">copy id</button>
+    <span class="meta" id="meta"></span>
+    <button id="modeBtn">mode: text</button>
+    <button id="wipe">rm -rf</button>
+    <button id="addPeer" class="hidden">+ друг</button>
+    <button id="leave">exit</button>
+  </header>
+  <div id="log" aria-live="polite"></div>
+  <form id="form" autocomplete="off">
+    <span>$</span>
+    <input id="text" maxlength="500" placeholder="сообщение" aria-label="сообщение">
+    <button type="submit">send</button>
+  </form>
+</section>
+
+
+<div id="manual" class="hidden" role="dialog" aria-modal="true">
+  <div class="box">
+    <p id="mTitle" style="color:var(--fg)"></p>
+    <div id="mBoxOut"><p id="mHintOut"></p><textarea id="mOut" readonly></textarea><button id="mCopy">скопировать код</button></div>
+    <div id="mBoxIn"><p id="mHintIn"></p><textarea id="mIn" spellcheck="false"></textarea><button id="mApply"></button></div>
+    <div id="mErr" role="status" style="order:3"></div>
+    <button id="mClose" style="order:4;align-self:flex-start">закрыть</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const PREFIX = 'kano:';
+  const PEER_PREFIX = 'kano-';
+  const MAX_SAVED = 300;
+  const ALPHA = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const MODES = ['text', 'binary', 'hex'];
+
+  let peer, hostConn, conns = [], isHost = false;
+  let room = '', me = '', mode = 0, count = 1, seen = new Set(), history = [];
+
+  /* ---------- encoding ---------- */
+  const enc = new TextEncoder();
+  const toBin = s => Array.from(enc.encode(s), b => b.toString(2).padStart(8, '0')).join(' ');
+  const toHex = s => Array.from(enc.encode(s), b => b.toString(16).padStart(2, '0')).join(' ');
+  const show = s => mode === 1 ? toBin(s) : mode === 2 ? toHex(s) : s;
+  $('nickBin').textContent = toBin('kano');
+
+  /* ---------- local storage (the only place data lives) ---------- */
+  const load = r => { try { return JSON.parse(localStorage.getItem(PREFIX + 'room:' + r)) || []; } catch { return []; } };
+  const save = () => { try { localStorage.setItem(PREFIX + 'room:' + room, JSON.stringify(history.slice(-MAX_SAVED))); } catch {} };
+  const usedBytes = () => {
+    let n = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PREFIX)) n += (k.length + localStorage.getItem(k).length) * 2;
+    }
+    return n;
+  };
+  const fmt = b => b < 1024 ? b + ' B' : (b / 1024).toFixed(1) + ' KB';
+
+  function wipeAll() {
+    Object.keys(localStorage).filter(k => k.startsWith(PREFIX)).forEach(k => localStorage.removeItem(k));
+    history = []; seen = new Set(); $('log').innerHTML = '';
+    sys('local data wiped');
+    updateMeta();
+  }
+
+  /* ---------- rendering ---------- */
+  const hhmm = ts => new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const paint = d => {
+    const x = d.querySelector('.x');
+    x.textContent = ': ' + show(d.dataset.raw);
+    x.classList.toggle('coded', mode !== 0);
+  };
+
+  function draw(m) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + (m.name === me ? 'me' : 'other');
+    d.dataset.raw = m.text;
+    const t = document.createElement('span'); t.className = 't'; t.textContent = hhmm(m.ts) + ' ';
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = m.name;
+    const x = document.createElement('span'); x.className = 'x';
+    d.append(t, n, x);
+    paint(d);
+    $('log').appendChild(d);
+    $('log').scrollTop = 1e9;
+  }
+  function sys(text) {
+    const d = document.createElement('div');
+    d.className = 'msg sys'; d.textContent = '# ' + text;
+    $('log').appendChild(d); $('log').scrollTop = 1e9;
+  }
+  function updateMeta() { $('meta').textContent = `online: ${count} · local: ${fmt(usedBytes())}`; }
+  function addMsg(m) {
+    if (seen.has(m.id)) return;
+    seen.add(m.id); history.push(m); draw(m); save(); updateMeta();
+  }
+  const clean = m => ({ id: String(m.id), name: String(m.name).slice(0, 20), text: String(m.text).slice(0, 500), ts: +m.ts || Date.now() });
+
+  /* ---------- networking (PeerJS: signaling only, data goes peer-to-peer) ---------- */
+  const openConns = () => conns.filter(c => c.open);
+  function broadcast(payload, except) { openConns().forEach(c => { if (c !== except) c.send(payload); }); }
+  function pushCount() { count = openConns().length + 1; broadcast({ t: 'count', n: count }); updateMeta(); }
+
+  function wire(c) {
+    c.on('open', () => {
+      if (isHost) { c.send({ t: 'hist', msgs: history.slice(-50) }); pushCount(); sys('peer connected'); }
+    });
+    c.on('data', d => {
+      if (!d || typeof d !== 'object') return;
+      if (d.t === 'msg' && d.m && typeof d.m.text === 'string') {
+        addMsg(clean(d.m));
+        if (isHost) broadcast(d, c);
+      } else if (d.t === 'hist' && Array.isArray(d.msgs)) {
+        d.msgs.forEach(m => addMsg(clean(m)));
+      } else if (d.t === 'count' && !isHost) { count = +d.n || 1; updateMeta(); }
+    });
+    c.on('close', () => {
+      conns = conns.filter(x => x !== c);
+      if (isHost) { pushCount(); sys('peer disconnected'); }
+      else { sys('host closed the channel. connection lost'); count = 1; updateMeta(); }
+    });
+  }
+
+  function enter() {
+    $('gate').classList.add('hidden'); $('rain').classList.add('hidden'); $('chat').classList.remove('hidden');
+    stopRain();
+    $('roomLabel').textContent = room;
+    history = load(room);
+    history.forEach(m => { seen.add(m.id); draw(m); });
+    sys(isHost ? 'channel created. share id: ' + room : 'connected to ' + room);
+    updateMeta(); $('text').focus();
+  }
+
+  function connect(code, host) {
+    if (typeof Peer === 'undefined') {
+      $('err').textContent = 'библиотека PeerJS не загрузилась. проверь интернет, отключи блокировщик рекламы или VPN и обнови страницу';
+      return;
+    }
+    $('err').textContent = 'подключаюсь к серверу соединения…';
+    $('go').disabled = true;
+    isHost = host; room = code;
+    peer = host ? new Peer(PEER_PREFIX + code) : new Peer();
+    const myPeer = peer;
+    const guard = setTimeout(() => {
+      if (peer === myPeer && !myPeer.open) fail('сервер соединения не отвечает. возможно, он заблокирован в твоей сети: попробуй другую сеть, мобильный интернет или VPN');
+    }, 9000);
+    peer.on('open', () => {
+      clearTimeout(guard);
+      if (host) { $('err').textContent = ''; enter(); return; }
+      $('err').textContent = 'ищу канал…';
+      hostConn = peer.connect(PEER_PREFIX + code, { reliable: true });
+      conns = [hostConn]; wire(hostConn);
+      hostConn.on('open', () => { $('err').textContent = ''; enter(); });
+      setTimeout(() => { if (peer === myPeer && !hostConn.open) fail('канал не отвечает. проверь код и что создатель не закрыл страницу'); }, 12000);
+    });
+    peer.on('connection', c => { if (isHost) { conns.push(c); wire(c); } });
+    peer.on('error', e => {
+      clearTimeout(guard);
+      const map = {
+        'unavailable-id': 'этот код уже занят. оставь поле пустым, чтобы получить новый',
+        'peer-unavailable': 'канал с таким кодом не найден',
+        'network': 'нет связи с сервером соединения. проверь интернет или смени сеть',
+        'server-error': 'сервер соединения недоступен. попробуй позже или в другой сети',
+        'socket-error': 'не удалось открыть соединение с сервером. попробуй другую сеть или VPN',
+        'socket-closed': 'соединение с сервером оборвалось. обнови страницу',
+        'browser-incompatible': 'этот браузер не поддерживает WebRTC. открой в Chrome или Safari',
+        'webrtc': 'ошибка WebRTC. обнови страницу и попробуй ещё раз'
+      };
+      if (peer === myPeer || !peer) fail(map[e.type] || 'ошибка связи: ' + e.type);
+    });
+  }
+  function fail(msg) {
+    $('err').textContent = msg + (/сервер|библиотек/.test(msg) ? ' · или нажми «без сервера» ниже' : ''); $('go').disabled = false;
+    if (peer) { peer.destroy(); peer = null; }
+  }
+
+  /* ---------- ui ---------- */
+  $('go').onclick = () => {
+    me = $('name').value.trim().slice(0, 20);
+    if (!me) { $('err').textContent = 'введи username'; return; }
+    let code = $('code').value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (code) connect(code, false);
+    else {
+      code = Array.from({ length: 6 }, () => ALPHA[Math.random() * ALPHA.length | 0]).join('');
+      connect(code, true);
+    }
+  };
+  [$('name'), $('code')].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); }));
+
+  $('form').onsubmit = e => {
+    e.preventDefault();
+    const text = $('text').value.trim();
+    if (!text) return;
+    const m = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: me, text, ts: Date.now() };
+    addMsg(m);
+    const payload = { t: 'msg', m };
+    if (isHost) broadcast(payload); else if (hostConn && hostConn.open) hostConn.send(payload); else sys('no connection. message saved only locally');
+    $('text').value = '';
+  };
+
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(room); $('copy').textContent = 'copied'; }
+    catch { $('copy').textContent = room; }
+    setTimeout(() => $('copy').textContent = 'copy id', 1600);
+  };
+
+  $('modeBtn').onclick = () => {
+    mode = (mode + 1) % MODES.length;
+    $('modeBtn').textContent = 'mode: ' + MODES[mode];
+    $('log').querySelectorAll('.msg[data-raw]').forEach(paint);
+  };
+
+  let armTimer;
+  const resetWipe = () => { $('wipe').classList.remove('armed'); $('wipe').textContent = 'rm -rf'; };
+  $('wipe').onclick = () => {
+    if ($('wipe').classList.contains('armed')) { clearTimeout(armTimer); resetWipe(); wipeAll(); return; }
+    $('wipe').classList.add('armed'); $('wipe').textContent = 'sure?';
+    armTimer = setTimeout(resetWipe, 4000);
+  };
+
+  $('leave').onclick = () => { if (peer) peer.destroy(); location.reload(); };
+
+  /* ---------- falling binary on the gate screen ---------- */
+  let rainId = null;
+  function startRain() {
+    const cv = $('rain'), ctx = cv.getContext('2d');
+    const size = 16; let cols, drops;
+    const resize = () => {
+      cv.width = innerWidth; cv.height = innerHeight;
+      cols = Math.ceil(cv.width / size);
+      drops = Array.from({ length: cols }, () => Math.random() * -50);
+    };
+    resize(); addEventListener('resize', resize);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const step = () => {
+      ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = '#39ff88'; ctx.font = size + 'px JetBrains Mono, monospace';
+      drops.forEach((y, i) => {
+        ctx.fillText(Math.random() < .5 ? '0' : '1', i * size, y * size);
+        drops[i] = y * size > cv.height && Math.random() > .975 ? 0 : y + 1;
+      });
+    };
+    if (reduce) { for (let k = 0; k < 40; k++) step(); return; }
+    let last = 0;
+    const loop = t => { if (t - last > 70) { step(); last = t; } rainId = requestAnimationFrame(loop); };
+    rainId = requestAnimationFrame(loop);
+  }
+  function stopRain() { if (rainId) cancelAnimationFrame(rainId); }
+  startRain();
+
+  /* ---------- manual mode: no signaling server, codes are copy-pasted ---------- */
+  class Chan {
+    constructor(dc) {
+      this.dc = dc; this.ev = {}; this.open = false;
+      dc.onopen = () => { this.open = true; this.emit('open'); };
+      dc.onclose = () => { this.open = false; this.emit('close'); };
+      dc.onmessage = e => { try { this.emit('data', JSON.parse(e.data)); } catch {} };
+    }
+    on(n, f) { (this.ev[n] = this.ev[n] || []).push(f); }
+    emit(n, a) { (this.ev[n] || []).forEach(f => f(a)); }
+    send(o) { this.dc.send(JSON.stringify(o)); }
+  }
+  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+  const gather = pc => new Promise(res => {
+    if (pc.iceGatheringState === 'complete') return res();
+    pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') res(); });
+    setTimeout(res, 5000);
+  });
+  const pack = d => btoa(JSON.stringify({ type: d.type, sdp: d.sdp }));
+  const unpack = s => JSON.parse(atob(s.replace(/\s+/g, '')));
+  let mPc = null, mMode = '';
+
+  function afterOpen() {
+    $('manual').classList.add('hidden');
+    if ($('chat').classList.contains('hidden')) { room = 'manual'; enter(); }
+    $('copy').classList.add('hidden');
+    $('addPeer').classList.toggle('hidden', !isHost);
+    pushCount && isHost && pushCount();
+  }
+  function hookHost(chan) { conns.push(chan); wire(chan); chan.on('open', afterOpen); }
+
+  async function openManual(mode) {
+    mMode = mode;
+    $('manual').classList.remove('hidden');
+    $('mOut').value = ''; $('mIn').value = ''; $('mErr').textContent = '';
+    const host = mode === 'host';
+    $('mBoxOut').style.order = host ? 1 : 2;
+    $('mBoxIn').style.order = host ? 2 : 1;
+    $('mApply').textContent = host ? 'подключить' : 'создать ответ';
+    $('mTitle').textContent = host ? 'создаёшь канал без сервера' : 'заходишь в канал без сервера';
+    $('mHintOut').textContent = host ? '1. отправь этот код другу в любой мессенджер' : '2. отправь этот ответный код создателю канала';
+    $('mHintIn').textContent = host ? '2. вставь сюда ответный код от друга и нажми «подключить»' : '1. вставь сюда код от создателя и нажми «создать ответ»';
+    if (typeof RTCPeerConnection === 'undefined') { $('mErr').textContent = 'этот браузер не поддерживает WebRTC'; return; }
+    if (host) {
+      isHost = true; room = 'manual';
+      try {
+        mPc = new RTCPeerConnection(ICE);
+        hookHost(new Chan(mPc.createDataChannel('chat')));
+        $('mOut').value = 'готовлю код…';
+        await mPc.setLocalDescription(await mPc.createOffer());
+        await gather(mPc);
+        $('mOut').value = pack(mPc.localDescription);
+      } catch (e) { $('mErr').textContent = 'не удалось создать код: ' + e.message; }
+    }
+  }
+
+  $('mApply').onclick = async () => {
+    const raw = $('mIn').value.trim();
+    if (!raw) { $('mErr').textContent = 'сначала вставь код'; return; }
+    try {
+      const d = unpack(raw);
+      if (mMode === 'host') {
+        await mPc.setRemoteDescription(d);
+        $('mErr').textContent = 'ждём соединение…';
+      } else {
+        isHost = false; room = 'manual';
+        mPc = new RTCPeerConnection(ICE);
+        mPc.ondatachannel = e => {
+          const chan = new Chan(e.channel);
+          hostConn = chan; conns = [chan]; wire(chan); chan.on('open', afterOpen);
+          if (e.channel.readyState === 'open') { chan.open = true; chan.emit('open'); }
+        };
+        await mPc.setRemoteDescription(d);
+        await mPc.setLocalDescription(await mPc.createAnswer());
+        $('mErr').textContent = 'готовлю ответ…';
+        await gather(mPc);
+        $('mOut').value = pack(mPc.localDescription);
+        $('mErr').textContent = 'отправь ответ создателю. ждём соединение…';
+      }
+    } catch { $('mErr').textContent = 'неверный код. скопируй его целиком, без лишних символов'; }
+  };
+  $('mCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('mOut').value); $('mCopy').textContent = 'скопировано'; }
+    catch { $('mOut').select(); }
+    setTimeout(() => $('mCopy').textContent = 'скопировать код', 1600);
+  };
+  $('mClose').onclick = () => $('manual').classList.add('hidden');
+  $('mHost').onclick = () => openManual('host');
+  $('mJoin').onclick = () => openManual('join');
+  $('addPeer').onclick = () => openManual('host');
+
+})();
+</script>
+</body>
+</html>
